@@ -58,7 +58,10 @@ private func makeEnvironment(
       .notDetermined
     },
   request:
-    @escaping @Sendable (PermissionType, PermissionRequestOptions) async -> PermissionRequestResult =
+    @escaping @Sendable (
+      PermissionType,
+      PermissionRequestOptions
+    ) async -> PermissionRequestResult =
     { _, _ in
       .failed(.apiUnavailable)
     }
