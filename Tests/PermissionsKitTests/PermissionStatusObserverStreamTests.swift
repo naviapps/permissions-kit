@@ -6,6 +6,17 @@ import XCTest
 
 @MainActor
 final class PermissionStatusObserverStreamTests: XCTestCase {
+  func testStreamFinishesImmediatelyForEmptyTypes() async {
+    let stream = PermissionStatusObserver.changes(
+      for: [],
+      using: SequenceChecker(sequences: [:])
+    )
+
+    var iterator = stream.makeAsyncIterator()
+    let change = await iterator.next()
+    XCTAssertNil(change)
+  }
+
   func testStreamEmitsChangeAndCustomLog() async {
     let checker = SequenceChecker(
       sequences: [
@@ -37,8 +48,54 @@ final class PermissionStatusObserverStreamTests: XCTestCase {
 
     await fulfillment(of: [exp], timeout: 1.0)
     task.cancel()
-    let count = await logSink.count()
-    XCTAssertGreaterThan(count, 0)
+    let entries = await logSink.snapshot()
+    XCTAssertEqual(entries.count, 1)
+    XCTAssertTrue(entries[0].contains("[PermissionsKit] accessibility changed:"))
+  }
+
+  func testCustomLogUsesStableTypeID() async {
+    let custom = PermissionType.custom(
+      .init(
+        id: "custom.permission",
+        capability: .init(
+          supportsStatusCheck: true,
+          supportsRequest: false,
+          systemSettingsURL: nil,
+          requiresRelaunch: false,
+          usageDescriptionKeys: []
+        )))
+    let checker = SequenceChecker(
+      sequences: [
+        custom: [.supported(.denied), .supported(.granted)]
+      ]
+    )
+    let logSink = LogSink()
+    let stream = PermissionStatusObserver.changes(
+      for: [custom],
+      using: checker,
+      configuration: .init(
+        pollingInterval: .milliseconds(10),
+        logHandler: { value in
+          Task { await logSink.append(value) }
+        }
+      )
+    )
+
+    let exp = expectation(description: "received change")
+    let task = Task {
+      for await change in stream where change.type == custom {
+        XCTAssertEqual(change.oldStatus, .supported(.denied))
+        XCTAssertEqual(change.newStatus, .supported(.granted))
+        exp.fulfill()
+        break
+      }
+    }
+
+    await fulfillment(of: [exp], timeout: 1.0)
+    task.cancel()
+    let entries = await logSink.snapshot()
+    XCTAssertEqual(entries.count, 1)
+    XCTAssertTrue(entries[0].contains("[PermissionsKit] custom.permission changed:"))
   }
 
   func testStreamRespondsToNotificationHooks() async {
@@ -154,8 +211,8 @@ private actor LogSink {
     entries.append(value)
   }
 
-  func count() -> Int {
-    entries.count
+  func snapshot() -> [String] {
+    entries
   }
 }
 

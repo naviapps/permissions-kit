@@ -115,7 +115,6 @@ struct AccessibilityPermissionEvaluation {
   let shouldResetPrompt: Bool
   let shouldResetGuidance: Bool
   let shouldPrompt: Bool
-  let shouldOpenSettingsImmediately: Bool
   let shouldPresentGuidance: Bool
   let initialResult: PermissionResult
 }
@@ -131,7 +130,6 @@ func evaluateAccessibilityPermission(
       shouldResetPrompt: true,
       shouldResetGuidance: true,
       shouldPrompt: false,
-      shouldOpenSettingsImmediately: false,
       shouldPresentGuidance: false,
       initialResult: .granted
     )
@@ -141,7 +139,6 @@ func evaluateAccessibilityPermission(
     shouldResetPrompt: false,
     shouldResetGuidance: false,
     shouldPrompt: hasPrompted == false,
-    shouldOpenSettingsImmediately: userInitiated && hasPrompted == false,
     shouldPresentGuidance: userInitiated && hasPresentedGuidance == false,
     initialResult: .pending
   )
@@ -248,9 +245,6 @@ private final class AccessibilityPermissionStrategy {
       hasPrompted = true
       _ = await permissions.requestAccess(for: .accessibility)
       logger.warning(guidance.accessibility.message)
-      if evaluation.shouldOpenSettingsImmediately {
-        dependencies.openSettings(SystemPermissionURLs.accessibility)
-      }
     }
 
     presentGuidanceIfNeeded(userInitiated: evaluation.shouldPresentGuidance)

@@ -45,16 +45,33 @@ final class AnySystemPermissionsStoreTests: XCTestCase {
   }
 
   @MainActor
-  func testForwardsActionsToWrappedStore() {
+  func testSendsObjectWillChangeWhenSnapshotChanges() async {
+    let wrappedStore = MutablePermissionsStore()
+    let store = AnySystemPermissionsStore(wrappedStore)
+    var changeCount = 0
+    let cancellable = store.objectWillChange.sink {
+      changeCount += 1
+    }
+
+    wrappedStore.accessibilityGranted = true
+    await Task.yield()
+
+    XCTAssertEqual(changeCount, 1)
+    XCTAssertTrue(store.accessibilityGranted)
+    withExtendedLifetime(cancellable) {}
+  }
+
+  @MainActor
+  func testForwardsActionsToWrappedStore() async {
     let wrappedStore = MutablePermissionsStore()
     let store = AnySystemPermissionsStore(wrappedStore)
 
-    store.refreshAll()
-    store.requestInputMonitoringPermission()
-    store.requestAccessibilityPermission()
-    store.requestAutomationPermission()
-    store.requestScreenRecordingPermission()
-    store.requestNotificationPermission()
+    await store.refreshAll()
+    await store.requestInputMonitoringPermission()
+    await store.requestAccessibilityPermission()
+    await store.requestAutomationPermission()
+    await store.requestScreenRecordingPermission()
+    await store.requestNotificationPermission()
 
     XCTAssertEqual(
       wrappedStore.calls,
@@ -67,6 +84,34 @@ final class AnySystemPermissionsStoreTests: XCTestCase {
         "requestNotificationPermission",
       ])
   }
+
+  @MainActor
+  func testForwardedActionSynchronizesSnapshotBeforeReturning() async {
+    let wrappedStore = MutablePermissionsStore()
+    wrappedStore.refreshAllAccessibilityValue = true
+    let store = AnySystemPermissionsStore(wrappedStore)
+
+    await store.refreshAll()
+
+    XCTAssertTrue(store.accessibilityGranted)
+  }
+
+  @MainActor
+  func testForwardedActionSendsSingleChangeNotification() async {
+    let wrappedStore = MutablePermissionsStore()
+    wrappedStore.refreshAllAccessibilityValue = true
+    let store = AnySystemPermissionsStore(wrappedStore)
+    var changeCount = 0
+    let cancellable = store.objectWillChange.sink {
+      changeCount += 1
+    }
+
+    await store.refreshAll()
+    await Task.yield()
+
+    XCTAssertEqual(changeCount, 1)
+    withExtendedLifetime(cancellable) {}
+  }
 }
 
 @MainActor
@@ -77,32 +122,36 @@ private final class MutablePermissionsStore: ObservableObject, SystemPermissions
   @Published var notificationsGranted = false
   @Published var inputMonitoringGranted = false
   private(set) var calls: [String] = []
+  var refreshAllAccessibilityValue: Bool?
 
   func sendUnchangedObjectWillChange() {
     objectWillChange.send()
   }
 
-  func refreshAll() {
+  func refreshAll() async {
     calls.append("refreshAll")
+    if let refreshAllAccessibilityValue {
+      accessibilityGranted = refreshAllAccessibilityValue
+    }
   }
 
-  func requestInputMonitoringPermission() {
+  func requestInputMonitoringPermission() async {
     calls.append("requestInputMonitoringPermission")
   }
 
-  func requestAccessibilityPermission() {
+  func requestAccessibilityPermission() async {
     calls.append("requestAccessibilityPermission")
   }
 
-  func requestAutomationPermission() {
+  func requestAutomationPermission() async {
     calls.append("requestAutomationPermission")
   }
 
-  func requestScreenRecordingPermission() {
+  func requestScreenRecordingPermission() async {
     calls.append("requestScreenRecordingPermission")
   }
 
-  func requestNotificationPermission() {
+  func requestNotificationPermission() async {
     calls.append("requestNotificationPermission")
   }
 }

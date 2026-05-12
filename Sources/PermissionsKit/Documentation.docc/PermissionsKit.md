@@ -34,6 +34,13 @@ let result = await checker.status(for: .camera)
 
 Use ``PermissionOperationResult/status`` when you only need the normalized status value. Check ``PermissionOperationResult/isUnsupported`` when the system does not expose a reliable API for the permission.
 
+Request access with ``PermissionChecker/requestAccess(for:options:)`` and open manual settings flows with ``PermissionChecker/openSystemSettings(for:)``:
+
+```swift
+let request = await checker.requestAccess(for: .camera)
+let settings = checker.openSystemSettings(for: .screenRecording)
+```
+
 ## Permission Capabilities
 
 Each ``PermissionType`` exposes a ``PermissionCapability``:
@@ -74,6 +81,7 @@ let stream = PermissionStatusObserver.changes(
 ```
 
 The observer combines polling with selected system notifications where available.
+It emits changes after the first observed status; it does not emit an initial snapshot.
 
 ## Topics
 

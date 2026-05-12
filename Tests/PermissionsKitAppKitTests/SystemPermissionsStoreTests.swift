@@ -7,6 +7,24 @@ import XCTest
 
 final class SystemPermissionsStoreTests: XCTestCase {
   @MainActor
+  func testInitializerDoesNotRefreshUntilRequested() {
+    let permissions = CountingPermissionChecker()
+    let store = SystemPermissionsStore(
+      permissions: permissions,
+      coordinator: SystemPermissionCoordinator(),
+      automationStatusProvider: { true },
+      notificationStatusProvider: { true }
+    )
+
+    XCTAssertFalse(store.accessibilityGranted)
+    XCTAssertFalse(store.automationGranted)
+    XCTAssertFalse(store.screenRecordingGranted)
+    XCTAssertFalse(store.notificationsGranted)
+    XCTAssertFalse(store.inputMonitoringGranted)
+    XCTAssertTrue(permissions.statusCalls.isEmpty)
+  }
+
+  @MainActor
   func testRefreshAllUsesProviders() async {
     let permissions = StubPermissionChecker(statuses: [
       .accessibility: .granted,
@@ -21,14 +39,25 @@ final class SystemPermissionsStoreTests: XCTestCase {
       notificationStatusProvider: { true }
     )
 
-    store.refreshAll()
-    try? await Task.sleep(nanoseconds: 100_000_000)
+    await store.refreshAll()
 
     XCTAssertTrue(store.accessibilityGranted)
     XCTAssertTrue(store.automationGranted)
     XCTAssertFalse(store.screenRecordingGranted)
     XCTAssertTrue(store.notificationsGranted)
     XCTAssertTrue(store.inputMonitoringGranted)
+  }
+
+  @MainActor
+  func testRefreshAllUsesAutomationCoordinatorWhenProviderMissing() async {
+    let store = SystemPermissionsStore(
+      permissions: StubPermissionChecker(),
+      coordinator: makeAutomationCoordinator(status: noErr)
+    )
+
+    await store.refreshAll()
+
+    XCTAssertTrue(store.automationGranted)
   }
 
   @MainActor
@@ -42,10 +71,23 @@ final class SystemPermissionsStoreTests: XCTestCase {
       automationStatusProvider: { false }
     )
 
-    store.refreshAll()
-    try? await Task.sleep(nanoseconds: 100_000_000)
+    await store.refreshAll()
 
     XCTAssertTrue(store.notificationsGranted)
+  }
+
+  @MainActor
+  func testRefreshAllUsesDefaultNotificationOptions() async {
+    let permissions = OptionRecordingPermissionChecker(statuses: [.notifications: .granted])
+    let store = SystemPermissionsStore(
+      permissions: permissions,
+      coordinator: SystemPermissionCoordinator(),
+      automationStatusProvider: { false }
+    )
+
+    await store.refreshAll()
+
+    XCTAssertEqual(permissions.statusOptions[.notifications], .notifications(.default))
   }
 
   @MainActor
@@ -56,11 +98,22 @@ final class SystemPermissionsStoreTests: XCTestCase {
       coordinator: SystemPermissionCoordinator()
     )
 
-    await waitForStoreTasks()
-    store.requestNotificationPermission()
-    await waitForStoreTasks()
+    await store.requestNotificationPermission()
 
     XCTAssertTrue(store.notificationsGranted)
+  }
+
+  @MainActor
+  func testRequestNotificationPermissionUsesDefaultOptions() async {
+    let permissions = OptionRecordingPermissionChecker(statuses: [.notifications: .granted])
+    let store = SystemPermissionsStore(
+      permissions: permissions,
+      coordinator: SystemPermissionCoordinator()
+    )
+
+    await store.requestNotificationPermission()
+
+    XCTAssertEqual(permissions.requestOptions[.notifications], .notifications(.default))
   }
 
   @MainActor
@@ -71,9 +124,7 @@ final class SystemPermissionsStoreTests: XCTestCase {
       coordinator: SystemPermissionCoordinator()
     )
 
-    await waitForStoreTasks()
-    store.requestScreenRecordingPermission()
-    await waitForStoreTasks()
+    await store.requestScreenRecordingPermission()
 
     XCTAssertTrue(store.screenRecordingGranted)
   }
@@ -89,9 +140,10 @@ final class SystemPermissionsStoreTests: XCTestCase {
       notificationStatusProvider: { false }
     )
 
+    async let refresh: Void = store.refreshAll()
     await fulfillment(of: [refreshStarted], timeout: 1.0)
-    store.requestScreenRecordingPermission()
-    try? await Task.sleep(nanoseconds: 300_000_000)
+    await store.requestScreenRecordingPermission()
+    await refresh
 
     XCTAssertTrue(store.screenRecordingGranted)
   }
@@ -106,9 +158,7 @@ final class SystemPermissionsStoreTests: XCTestCase {
       coordinator: SystemPermissionCoordinator()
     )
 
-    await waitForStoreTasks()
-    store.requestScreenRecordingPermission()
-    await waitForStoreTasks()
+    await store.requestScreenRecordingPermission()
 
     XCTAssertFalse(store.screenRecordingGranted)
   }
@@ -123,9 +173,7 @@ final class SystemPermissionsStoreTests: XCTestCase {
       coordinator: SystemPermissionCoordinator()
     )
 
-    await waitForStoreTasks()
-    store.requestInputMonitoringPermission()
-    await waitForStoreTasks()
+    await store.requestInputMonitoringPermission()
 
     XCTAssertFalse(store.inputMonitoringGranted)
     XCTAssertEqual(permissions.openedSettingsTypes, [.inputMonitoring])
@@ -142,33 +190,31 @@ final class SystemPermissionsStoreTests: XCTestCase {
       coordinator: SystemPermissionCoordinator()
     )
 
-    await waitForStoreTasks()
-    store.requestInputMonitoringPermission()
-    await waitForStoreTasks()
+    await store.requestInputMonitoringPermission()
 
     XCTAssertTrue(store.inputMonitoringGranted)
   }
 
   @MainActor
-  func testRequestAutomationPermissionUpdatesGranted() {
+  func testRequestAutomationPermissionUpdatesGranted() async {
     let store = SystemPermissionsStore(
       permissions: StubPermissionChecker(),
       coordinator: makeAutomationCoordinator(status: noErr)
     )
 
-    store.requestAutomationPermission()
+    await store.requestAutomationPermission()
 
     XCTAssertTrue(store.automationGranted)
   }
 
   @MainActor
-  func testRequestAutomationPermissionSetsFalseWhenDenied() {
+  func testRequestAutomationPermissionSetsFalseWhenDenied() async {
     let store = SystemPermissionsStore(
       permissions: StubPermissionChecker(),
       coordinator: makeAutomationCoordinator(status: OSStatus(errAEEventNotPermitted))
     )
 
-    store.requestAutomationPermission()
+    await store.requestAutomationPermission()
 
     XCTAssertFalse(store.automationGranted)
   }
@@ -181,9 +227,7 @@ final class SystemPermissionsStoreTests: XCTestCase {
       coordinator: SystemPermissionCoordinator()
     )
 
-    await waitForStoreTasks()
-    store.requestAccessibilityPermission()
-    await waitForStoreTasks()
+    await store.requestAccessibilityPermission()
 
     XCTAssertTrue(store.accessibilityGranted)
   }
@@ -200,17 +244,16 @@ final class SystemPermissionsStoreTests: XCTestCase {
       coordinator: SystemPermissionCoordinator()
     )
 
-    await waitForStoreTasks()
+    await store.refreshAll()
     XCTAssertTrue(store.notificationsGranted)
 
-    store.requestNotificationPermission()
-    await waitForStoreTasks()
+    await store.requestNotificationPermission()
 
     XCTAssertFalse(store.notificationsGranted)
   }
 
   @MainActor
-  func testInitializerSeedsPublishedStateFromProviders() async {
+  func testRefreshAllSeedsPublishedStateFromProviders() async {
     let permissions = StubPermissionChecker(
       statuses: [
         .accessibility: .granted,
@@ -225,7 +268,7 @@ final class SystemPermissionsStoreTests: XCTestCase {
       notificationStatusProvider: { true }
     )
 
-    try? await Task.sleep(nanoseconds: 100_000_000)
+    await store.refreshAll()
 
     XCTAssertTrue(store.accessibilityGranted)
     XCTAssertTrue(store.inputMonitoringGranted)
@@ -247,7 +290,7 @@ final class SystemPermissionsStoreTests: XCTestCase {
       notificationStatusProvider: { true }
     )
 
-    await waitForStoreTasks()
+    await store.refreshAll()
 
     XCTAssertTrue(store.accessibilityGranted)
     XCTAssertTrue(store.inputMonitoringGranted)
@@ -255,10 +298,6 @@ final class SystemPermissionsStoreTests: XCTestCase {
     XCTAssertFalse(store.screenRecordingGranted)
     XCTAssertTrue(store.notificationsGranted)
   }
-}
-
-private func waitForStoreTasks() async {
-  try? await Task.sleep(nanoseconds: 100_000_000)
 }
 
 @MainActor
@@ -300,6 +339,55 @@ private struct StubPermissionChecker: PermissionChecking {
     if let result = requestResults[type] {
       return result
     }
+    return .supported(statuses[type] ?? .denied)
+  }
+
+  func openSystemSettings(for _: PermissionType) -> PermissionOpenSettingsResult {
+    .supported(.opened)
+  }
+}
+
+private final class CountingPermissionChecker: PermissionChecking, @unchecked Sendable {
+  private(set) var statusCalls: [PermissionType] = []
+
+  func status(for type: PermissionType, options _: PermissionRequestOptions) async
+    -> PermissionStatusResult
+  {
+    statusCalls.append(type)
+    return .supported(.denied)
+  }
+
+  func requestAccess(for _: PermissionType, options _: PermissionRequestOptions) async
+    -> PermissionRequestResult
+  {
+    .supported(.denied)
+  }
+
+  func openSystemSettings(for _: PermissionType) -> PermissionOpenSettingsResult {
+    .supported(.opened)
+  }
+}
+
+private final class OptionRecordingPermissionChecker: PermissionChecking, @unchecked Sendable {
+  let statuses: [PermissionType: PermissionStatus]
+  private(set) var statusOptions: [PermissionType: PermissionRequestOptions] = [:]
+  private(set) var requestOptions: [PermissionType: PermissionRequestOptions] = [:]
+
+  init(statuses: [PermissionType: PermissionStatus]) {
+    self.statuses = statuses
+  }
+
+  func status(for type: PermissionType, options: PermissionRequestOptions) async
+    -> PermissionStatusResult
+  {
+    statusOptions[type] = options
+    return .supported(statuses[type] ?? .denied)
+  }
+
+  func requestAccess(for type: PermissionType, options: PermissionRequestOptions) async
+    -> PermissionRequestResult
+  {
+    requestOptions[type] = options
     return .supported(statuses[type] ?? .denied)
   }
 

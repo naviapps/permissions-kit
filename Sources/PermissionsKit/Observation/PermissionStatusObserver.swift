@@ -37,7 +37,13 @@ public struct PermissionStatusObserver: Sendable {
       .none
     }
   ) -> AsyncStream<Change> {
-    AsyncStream { continuation in
+    guard types.isEmpty == false else {
+      return AsyncStream { continuation in
+        continuation.finish()
+      }
+    }
+
+    return AsyncStream { continuation in
       let task = Task { @MainActor in
         let state = PermissionStatusObserverState(
           checker: checker,
@@ -174,7 +180,7 @@ private final class PermissionStatusObserverState {
   ) {
     handler(.init(type: type, oldStatus: oldStatus, newStatus: newStatus))
     if let customLog = configuration.logHandler {
-      customLog("[PermissionsKit] \(type) changed: \(oldStatus) -> \(newStatus)")
+      customLog("[PermissionsKit] \(type.id) changed: \(oldStatus) -> \(newStatus)")
     }
   }
 

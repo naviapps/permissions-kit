@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/naviapps/permissions-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/naviapps/permissions-kit/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey.svg)](Package.swift)
-[![Swift Package Index](https://img.shields.io/badge/Swift%20Package%20Index-PermissionsKit-orange.svg)](https://swiftpackageindex.com/naviapps/permissions-kit)
+[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fnaviapps%2Fpermissions-kit%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/naviapps/permissions-kit)
+[![Supported platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fnaviapps%2Fpermissions-kit%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/naviapps/permissions-kit)
 
 PermissionsKit is a Swift Package for checking, requesting, and guiding users through macOS privacy permissions.
 
@@ -22,7 +22,7 @@ The package is split into two libraries:
 Add this package to your Swift Package dependencies:
 
 ```swift
-.package(url: "https://github.com/naviapps/permissions-kit.git", from: "0.1.0")
+.package(url: "https://github.com/naviapps/permissions-kit.git", from: "1.0.0")
 ```
 
 Then add one or both products to your target:
@@ -95,6 +95,8 @@ for await change in stream {
 }
 ```
 
+The observer emits changes after the first observed status; it does not emit an initial snapshot.
+
 ## UI Integration
 
 `PermissionsKitAppKit` includes `SystemPermissionsStore`, an `ObservableObject` for common app-facing permission state:
@@ -105,10 +107,12 @@ import PermissionsKitAppKit
 @MainActor
 let store = SystemPermissionsStore()
 
-store.refreshAll()
-store.requestAccessibilityPermission()
-store.requestScreenRecordingPermission()
+await store.refreshAll()
+await store.requestAccessibilityPermission()
+await store.requestScreenRecordingPermission()
 ```
+
+Call `refreshAll()` before reading initial state. Use `AnySystemPermissionsStore` when you need to pass a store through a type-erased UI boundary such as a SwiftUI environment.
 
 The AppKit product also includes `SystemPermissionCoordinator` for user-initiated Accessibility, Automation, and Screen Recording guidance flows.
 

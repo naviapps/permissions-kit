@@ -42,13 +42,30 @@ final class SystemPermissionCoordinatorTests: XCTestCase {
     XCTAssertEqual(requests, 1)
   }
 
-  func testEnsureAccessibilityPermissionUserInitiatedPresentsGuidanceAndOpensSettings() async {
+  func testAccessibilityGuidanceCancelDoesNotOpenSettings() async {
     let checker = StatusSequencePermissionChecker(statuses: [.denied, .denied])
     let recorder = DependencyRecorder()
     let coordinator = SystemPermissionCoordinator(
       guidance: .english,
       logger: NoopSystemPermissionLogger(),
       dependencies: recorder.dependencies(alertResponse: .alertSecondButtonReturn)
+    )
+
+    let result = await coordinator.ensureAccessibilityPermission(
+      using: checker, userInitiated: true)
+
+    XCTAssertFalse(result)
+    XCTAssertEqual(recorder.presentedAlerts.map(\.title), ["Accessibility permission required"])
+    XCTAssertEqual(recorder.openedSettingsURLs, [])
+  }
+
+  func testAccessibilityGuidanceAcceptOpensSettings() async {
+    let checker = StatusSequencePermissionChecker(statuses: [.denied, .denied])
+    let recorder = DependencyRecorder()
+    let coordinator = SystemPermissionCoordinator(
+      guidance: .english,
+      logger: NoopSystemPermissionLogger(),
+      dependencies: recorder.dependencies(alertResponse: .alertFirstButtonReturn)
     )
 
     let result = await coordinator.ensureAccessibilityPermission(

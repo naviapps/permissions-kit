@@ -62,6 +62,18 @@ final class PermissionCheckerStatusTests: XCTestCase {
     XCTAssertEqual(result, .supported(.granted))
   }
 
+  func testStatusUsesExplicitPhotoOptions() async {
+    let checker = PermissionChecker(
+      environment: makeEnvironment(status: { type, options in
+        XCTAssertEqual(type, .photos)
+        XCTAssertEqual(options, .photos(.addOnly))
+        return .granted
+      }))
+
+    let result = await checker.status(for: .photos, options: .photos(.addOnly))
+    XCTAssertEqual(result, .supported(.granted))
+  }
+
   func testSettingsOnlyStatusesAreUnsupported() async {
     let checker = PermissionChecker(environment: makeEnvironment(statuses: [:]))
 
@@ -102,6 +114,27 @@ final class PermissionCheckerStatusTests: XCTestCase {
     let status = await checker.status(for: type)
 
     XCTAssertEqual(status, .unsupported(capability))
+  }
+
+  func testCustomStatusSupportedUsesEnvironment() async {
+    let capability = PermissionCapability(
+      supportsStatusCheck: true,
+      supportsRequest: false,
+      systemSettingsURL: nil,
+      requiresRelaunch: false,
+      usageDescriptionKeys: []
+    )
+    let type = PermissionType.custom(.init(id: "custom.status", capability: capability))
+    let checker = PermissionChecker(
+      environment: makeEnvironment(status: { receivedType, options in
+        XCTAssertEqual(receivedType, type)
+        XCTAssertEqual(options, .none)
+        return .granted
+      }))
+
+    let status = await checker.status(for: type)
+
+    XCTAssertEqual(status, .supported(.granted))
   }
 }
 

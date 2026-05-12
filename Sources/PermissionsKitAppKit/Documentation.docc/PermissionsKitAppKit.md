@@ -11,6 +11,7 @@ Import `PermissionsKitAppKit` when you want to:
 - Use ``PermissionsKit/PermissionEnvironment/live`` with system frameworks.
 - Create a live ``PermissionsKit/PermissionChecker`` with `PermissionChecker()`.
 - Track common permission state through ``SystemPermissionsStore``.
+- Pass permission state across type-erased UI boundaries with ``AnySystemPermissionsStore``.
 - Present Accessibility, Automation, and Screen Recording guidance through ``SystemPermissionCoordinator``.
 - Customize guidance strings through ``SystemPermissionGuidanceStrings``.
 
@@ -36,12 +37,16 @@ Use ``SystemPermissionsStore`` when a view model or SwiftUI/AppKit bridge needs 
 @MainActor
 let store = SystemPermissionsStore()
 
-store.refreshAll()
-store.requestAccessibilityPermission()
-store.requestScreenRecordingPermission()
+await store.refreshAll()
+await store.requestAccessibilityPermission()
+await store.requestScreenRecordingPermission()
 ```
 
 The store is `@MainActor` and is designed for UI-facing state. For lower-level checking and testing, use ``PermissionsKit/PermissionChecker`` directly.
+
+Call ``SystemPermissionsStore/refreshAll()`` before reading initial state. Request methods such as ``SystemPermissionsStore/requestAccessibilityPermission()`` start the system flow and update the published state when they complete.
+
+Use ``AnySystemPermissionsStore`` when you need to pass any ``SystemPermissionsStoreProviding`` implementation through a type-erased boundary such as a SwiftUI environment.
 
 ## Guided System Permissions
 

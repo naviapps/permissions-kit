@@ -16,7 +16,6 @@ final class PermissionCoordinatorEvaluationTests: XCTestCase {
     XCTAssertTrue(evaluation.shouldResetPrompt)
     XCTAssertTrue(evaluation.shouldResetGuidance)
     XCTAssertFalse(evaluation.shouldPrompt)
-    XCTAssertFalse(evaluation.shouldOpenSettingsImmediately)
     XCTAssertFalse(evaluation.shouldPresentGuidance)
     XCTAssertEqual(evaluation.initialResult, PermissionResult.granted)
   }
@@ -30,7 +29,6 @@ final class PermissionCoordinatorEvaluationTests: XCTestCase {
     )
 
     XCTAssertTrue(evaluation.shouldPrompt)
-    XCTAssertTrue(evaluation.shouldOpenSettingsImmediately)
     XCTAssertTrue(evaluation.shouldPresentGuidance)
     XCTAssertFalse(evaluation.shouldResetPrompt)
     XCTAssertFalse(evaluation.shouldResetGuidance)
@@ -46,7 +44,6 @@ final class PermissionCoordinatorEvaluationTests: XCTestCase {
     )
 
     XCTAssertFalse(evaluation.shouldPrompt)
-    XCTAssertFalse(evaluation.shouldOpenSettingsImmediately)
     XCTAssertFalse(evaluation.shouldPresentGuidance)
     XCTAssertFalse(evaluation.shouldResetPrompt)
     XCTAssertFalse(evaluation.shouldResetGuidance)
@@ -61,7 +58,6 @@ final class PermissionCoordinatorEvaluationTests: XCTestCase {
       userInitiated: true
     )
     XCTAssertFalse(promptedWithoutGuidance.shouldPrompt)
-    XCTAssertFalse(promptedWithoutGuidance.shouldOpenSettingsImmediately)
     XCTAssertTrue(promptedWithoutGuidance.shouldPresentGuidance)
     XCTAssertEqual(promptedWithoutGuidance.initialResult, PermissionResult.pending)
 
@@ -72,7 +68,6 @@ final class PermissionCoordinatorEvaluationTests: XCTestCase {
       userInitiated: true
     )
     XCTAssertTrue(unpromptedWithGuidance.shouldPrompt)
-    XCTAssertTrue(unpromptedWithGuidance.shouldOpenSettingsImmediately)
     XCTAssertFalse(unpromptedWithGuidance.shouldPresentGuidance)
     XCTAssertEqual(unpromptedWithGuidance.initialResult, PermissionResult.pending)
   }

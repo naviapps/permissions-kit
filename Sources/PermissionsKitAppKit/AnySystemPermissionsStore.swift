@@ -47,33 +47,39 @@ public final class AnySystemPermissionsStore: ObservableObject, SystemPermission
   }
 
   /// Refreshes all tracked permission states.
-  public func refreshAll() {
-    wrappedStore.refreshAll()
+  public func refreshAll() async {
+    await wrappedStore.refreshAll()
+    syncFromWrappedStore()
   }
 
   /// Requests Input Monitoring access.
-  public func requestInputMonitoringPermission() {
-    wrappedStore.requestInputMonitoringPermission()
+  public func requestInputMonitoringPermission() async {
+    await wrappedStore.requestInputMonitoringPermission()
+    syncFromWrappedStore()
   }
 
   /// Requests Accessibility access.
-  public func requestAccessibilityPermission() {
-    wrappedStore.requestAccessibilityPermission()
+  public func requestAccessibilityPermission() async {
+    await wrappedStore.requestAccessibilityPermission()
+    syncFromWrappedStore()
   }
 
   /// Requests Automation access.
-  public func requestAutomationPermission() {
-    wrappedStore.requestAutomationPermission()
+  public func requestAutomationPermission() async {
+    await wrappedStore.requestAutomationPermission()
+    syncFromWrappedStore()
   }
 
   /// Requests Screen Recording access.
-  public func requestScreenRecordingPermission() {
-    wrappedStore.requestScreenRecordingPermission()
+  public func requestScreenRecordingPermission() async {
+    await wrappedStore.requestScreenRecordingPermission()
+    syncFromWrappedStore()
   }
 
   /// Requests notification authorization.
-  public func requestNotificationPermission() {
-    wrappedStore.requestNotificationPermission()
+  public func requestNotificationPermission() async {
+    await wrappedStore.requestNotificationPermission()
+    syncFromWrappedStore()
   }
 
   private func syncFromWrappedStore() {
