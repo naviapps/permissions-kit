@@ -140,9 +140,9 @@ extension PermissionEnvironment {
           return .supported(.denied)
         case .notDetermined:
           do {
-            let requestOptions = resolvedNotificationOptions(options)
+            let permissionOptions = resolvedNotificationOptions(options)
             let granted = try await UNUserNotificationCenter.current()
-              .requestAuthorization(options: requestOptions.systemValue)
+              .requestAuthorization(options: permissionOptions.systemValue)
             return .supported(granted ? .granted : .denied)
           } catch {
             return .failed(.apiUnavailable)
@@ -251,15 +251,14 @@ func mapSpeechStatus(_ status: SFSpeechRecognizerAuthorizationStatus) -> Permiss
   }
 }
 
-func resolvedPhotoAccessLevel(_ options: PermissionRequestOptions) -> PhotoAccessLevel {
+func resolvedPhotoAccessLevel(_ options: PermissionOptions) -> PhotoAccessLevel {
   if case .photos(let level) = options {
     return level
   }
   return .default
 }
 
-func resolvedNotificationOptions(_ options: PermissionRequestOptions) -> NotificationRequestOptions
-{
+func resolvedNotificationOptions(_ options: PermissionOptions) -> NotificationRequestOptions {
   if case .notifications(let value) = options {
     return value
   }

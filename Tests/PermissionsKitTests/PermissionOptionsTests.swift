@@ -2,7 +2,7 @@ import XCTest
 
 @testable import PermissionsKit
 
-final class PermissionRequestOptionsTests: XCTestCase {
+final class PermissionOptionsTests: XCTestCase {
   func testNotificationDefaults() {
     XCTAssertTrue(NotificationRequestOptions.default.contains(.alert))
     XCTAssertTrue(NotificationRequestOptions.default.contains(.badge))
@@ -30,18 +30,18 @@ final class PermissionRequestOptionsTests: XCTestCase {
     XCTAssertEqual(PhotoAccessLevel.addOnly.rawValue, "addOnly")
   }
 
-  func testPermissionRequestOptionsEquality() {
-    XCTAssertEqual(PermissionRequestOptions.none, .none)
+  func testPermissionOptionsEquality() {
+    XCTAssertEqual(PermissionOptions.none, .none)
     XCTAssertEqual(
-      PermissionRequestOptions.notifications([.alert, .badge]),
+      PermissionOptions.notifications([.alert, .badge]),
       .notifications([.alert, .badge])
     )
-    XCTAssertEqual(PermissionRequestOptions.photos(.addOnly), .photos(.addOnly))
-    XCTAssertNotEqual(PermissionRequestOptions.none, .notifications([]))
+    XCTAssertEqual(PermissionOptions.photos(.addOnly), .photos(.addOnly))
+    XCTAssertNotEqual(PermissionOptions.none, .notifications([]))
     XCTAssertNotEqual(
-      PermissionRequestOptions.notifications([.alert]),
+      PermissionOptions.notifications([.alert]),
       .notifications([.sound])
     )
-    XCTAssertNotEqual(PermissionRequestOptions.photos(.addOnly), .photos(.readWrite))
+    XCTAssertNotEqual(PermissionOptions.photos(.addOnly), .photos(.readWrite))
   }
 }

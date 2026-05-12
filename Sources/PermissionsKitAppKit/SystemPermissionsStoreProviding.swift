@@ -1,6 +1,6 @@
 import Combine
 
-/// Observable system-permission state and request actions for host UI integration.
+/// Common observable system-permission state and actions for UI integration and type erasure.
 @MainActor
 public protocol SystemPermissionsStoreProviding: ObservableObject {
   /// Current Accessibility grant state.
@@ -15,15 +15,15 @@ public protocol SystemPermissionsStoreProviding: ObservableObject {
   var inputMonitoringGranted: Bool { get }
 
   /// Refreshes all tracked permission states.
-  func refreshAll()
-  /// Requests Input Monitoring access.
-  func requestInputMonitoringPermission()
-  /// Requests Accessibility access.
-  func requestAccessibilityPermission()
-  /// Requests Automation access.
-  func requestAutomationPermission()
-  /// Requests Screen Recording access.
-  func requestScreenRecordingPermission()
-  /// Requests notification authorization.
-  func requestNotificationPermission()
+  func refreshAll() async
+  /// Starts the Input Monitoring permission flow and updates tracked state.
+  func requestInputMonitoringPermission() async
+  /// Starts the Accessibility permission flow and updates tracked state.
+  func requestAccessibilityPermission() async
+  /// Starts the Automation permission flow and updates tracked state.
+  func requestAutomationPermission() async
+  /// Starts the Screen Recording permission flow and updates tracked state.
+  func requestScreenRecordingPermission() async
+  /// Starts the notification authorization flow and updates tracked state.
+  func requestNotificationPermission() async
 }

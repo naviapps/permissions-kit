@@ -2,15 +2,17 @@
 
 [![CI](https://github.com/naviapps/permissions-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/naviapps/permissions-kit/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey.svg)](Package.swift)
-[![Swift Package Index](https://img.shields.io/badge/Swift%20Package%20Index-PermissionsKit-orange.svg)](https://swiftpackageindex.com/naviapps/permissions-kit)
+[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fnaviapps%2Fpermissions-kit%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/naviapps/permissions-kit)
+[![Supported platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fnaviapps%2Fpermissions-kit%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/naviapps/permissions-kit)
 
 PermissionsKit is a Swift Package for checking, requesting, and guiding users through macOS privacy permissions.
+
+It focuses on macOS privacy APIs where system behavior is uneven: supported permissions can be checked and requested directly, settings-only permissions expose metadata and System Settings links without pretending grant state is reliable, and permission side effects are injectable for tests and custom app flows.
 
 The package is split into two libraries:
 
 - `PermissionsKit`: core permission types, request/status contracts, usage-description metadata, and status observation.
-- `PermissionsKitAppKit`: live AppKit-backed implementations for macOS system APIs, System Settings deep links, and observable stores for app UI.
+- `PermissionsKitAppKit`: live AppKit-backed implementations for macOS system APIs, System Settings deep links, and small observable stores for common app UI flows.
 
 ## Requirements
 
@@ -22,7 +24,7 @@ The package is split into two libraries:
 Add this package to your Swift Package dependencies:
 
 ```swift
-.package(url: "https://github.com/naviapps/permissions-kit.git", from: "0.1.0")
+.package(url: "https://github.com/naviapps/permissions-kit.git", from: "1.0.0")
 ```
 
 Then add one or both products to your target:
@@ -31,6 +33,11 @@ Then add one or both products to your target:
 .product(name: "PermissionsKit", package: "permissions-kit"),
 .product(name: "PermissionsKitAppKit", package: "permissions-kit"),
 ```
+
+## Documentation
+
+- [PermissionsKit API reference](https://swiftpackageindex.com/naviapps/permissions-kit/documentation/permissionskit)
+- [PermissionsKitAppKit API reference](https://swiftpackageindex.com/naviapps/permissions-kit/documentation/permissionskitappkit)
 
 ## Basic Usage
 
@@ -70,6 +77,33 @@ let checker = PermissionChecker(
 
 Some macOS permissions can be checked and requested through public APIs. Others are settings-only: the package exposes capability metadata and System Settings URLs, but `status` and `requestAccess` return unsupported or failed results when macOS does not provide a reliable public API.
 
+Settings-only permissions are intentionally modeled as unsupported for status checks and direct requests. For example, Input Monitoring, Full Disk Access, and Automation can expose useful System Settings links and metadata, but the standard live implementation cannot reliably report them as granted through `PermissionChecker.status(for:)`. If your app has a trusted external signal for one of these permissions, inject it in your own environment or UI state.
+
+Permission behavior and System Settings deep links can vary across macOS releases. Prefer the capability metadata and operation results over assuming every permission behaves the same on every supported macOS version.
+
+| Permission type | Status check | Request | Settings URL | Info.plist key | Relaunch |
+| --- | --- | --- | --- | --- | --- |
+| `accessibility` | Yes | Yes | Yes | None | No |
+| `inputMonitoring` | Settings-only | Settings-only | Yes | None | Yes |
+| `screenRecording` | Yes | Yes | Yes | None | Yes |
+| `camera` | Yes | Yes | Yes | `NSCameraUsageDescription` | No |
+| `microphone` | Yes | Yes | Yes | `NSMicrophoneUsageDescription` | No |
+| `contacts` | Yes | Yes | Yes | `NSContactsUsageDescription` | No |
+| `calendars` | Yes | Yes | Yes | `NSCalendarsFullAccessUsageDescription` | No |
+| `reminders` | Yes | Yes | Yes | `NSRemindersFullAccessUsageDescription` | No |
+| `photos` | Yes | Yes | Yes | `NSPhotoLibraryUsageDescription` or `NSPhotoLibraryAddUsageDescription` | No |
+| `speechRecognition` | Yes | Yes | Yes | `NSSpeechRecognitionUsageDescription` | No |
+| `notifications` | Yes | Yes | Yes | None | No |
+| `location` | Settings-only | Settings-only | Yes | `NSLocationUsageDescription` | No |
+| `bluetooth` | Settings-only | Settings-only | Yes | `NSBluetoothAlwaysUsageDescription` | No |
+| `localNetwork` | Settings-only | Settings-only | Yes | `NSLocalNetworkUsageDescription` | No |
+| `mediaLibrary` | Settings-only | Settings-only | Yes | `NSAppleMusicUsageDescription` | No |
+| `systemAudioCapture` | Settings-only | Settings-only | Yes | `NSAudioCaptureUsageDescription` | No |
+| `desktopFolder` / `documentsFolder` / `downloadsFolder` | Settings-only | Settings-only | Yes | `NSDesktopFolderUsageDescription`, `NSDocumentsFolderUsageDescription`, `NSDownloadsFolderUsageDescription` | No |
+| `networkVolumes` / `removableVolumes` / `fileProviderDomain` | Settings-only | Settings-only | Yes | `NSNetworkVolumesUsageDescription`, `NSRemovableVolumesUsageDescription`, `NSFileProviderDomainUsageDescription` | No |
+| `fullDiskAccess` | Settings-only | Settings-only | Yes | None | Yes |
+| `automation` | Settings-only | Settings-only | Yes | `NSAppleEventsUsageDescription` | No |
+
 ## Usage Descriptions
 
 Permissions that require `Info.plist` usage descriptions expose their required keys:
@@ -95,9 +129,11 @@ for await change in stream {
 }
 ```
 
+The observer emits changes after the first observed status; it does not emit an initial snapshot.
+
 ## UI Integration
 
-`PermissionsKitAppKit` includes `SystemPermissionsStore`, an `ObservableObject` for common app-facing permission state:
+`PermissionsKitAppKit` includes `SystemPermissionsStore`, an `ObservableObject` for common app-facing permission state. It is intentionally small and tracks only Accessibility, Automation, Screen Recording, Notifications, and Input Monitoring. Use `PermissionChecker` directly for other permission types.
 
 ```swift
 import PermissionsKitAppKit
@@ -105,10 +141,12 @@ import PermissionsKitAppKit
 @MainActor
 let store = SystemPermissionsStore()
 
-store.refreshAll()
-store.requestAccessibilityPermission()
-store.requestScreenRecordingPermission()
+await store.refreshAll()
+await store.requestAccessibilityPermission()
+await store.requestScreenRecordingPermission()
 ```
+
+Call `refreshAll()` before reading initial state. Use `AnySystemPermissionsStore` when you need to pass a store through a type-erased UI boundary such as a SwiftUI environment.
 
 The AppKit product also includes `SystemPermissionCoordinator` for user-initiated Accessibility, Automation, and Screen Recording guidance flows.
 

@@ -1,4 +1,4 @@
-/// Configuration for `PermissionStatusObserver.changes(for:using:configuration:statusOptionsProvider:)`.
+/// Configuration for `PermissionStatusObserver.changes(for:using:configuration:optionsProvider:)`.
 public struct PermissionObservationConfiguration: Sendable {
   /// Polling interval used to re-check permission status.
   public var pollingInterval: Duration {

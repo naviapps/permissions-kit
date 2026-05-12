@@ -11,7 +11,7 @@ final class PermissionCheckingTests: XCTestCase {
     _ = await checker.status(for: .camera)
 
     XCTAssertEqual(
-      checker.statusOptions,
+      checker.observedOptions,
       [
         .notifications(.default),
         .photos(.default),
@@ -28,7 +28,7 @@ final class PermissionCheckingTests: XCTestCase {
     _ = await checker.requestAccess(for: .camera)
 
     XCTAssertEqual(
-      checker.requestOptions,
+      checker.permissionOptions,
       [
         .notifications(.default),
         .photos(.default),
@@ -40,23 +40,23 @@ final class PermissionCheckingTests: XCTestCase {
 
 private final class RecordingPermissionChecker: PermissionChecking, @unchecked Sendable {
   private let lock = NSLock()
-  private(set) var statusOptions: [PermissionRequestOptions] = []
-  private(set) var requestOptions: [PermissionRequestOptions] = []
+  private(set) var observedOptions: [PermissionOptions] = []
+  private(set) var permissionOptions: [PermissionOptions] = []
 
-  func status(for _: PermissionType, options: PermissionRequestOptions) async
+  func status(for _: PermissionType, options: PermissionOptions) async
     -> PermissionStatusResult
   {
     lock.withLock {
-      statusOptions.append(options)
+      observedOptions.append(options)
     }
     return .supported(.granted)
   }
 
-  func requestAccess(for _: PermissionType, options: PermissionRequestOptions) async
+  func requestAccess(for _: PermissionType, options: PermissionOptions) async
     -> PermissionRequestResult
   {
     lock.withLock {
-      requestOptions.append(options)
+      permissionOptions.append(options)
     }
     return .supported(.granted)
   }

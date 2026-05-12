@@ -33,17 +33,23 @@ public struct PermissionStatusObserver: Sendable {
     for types: [PermissionType],
     using checker: any PermissionChecking,
     configuration: PermissionObservationConfiguration = .init(),
-    statusOptionsProvider: @Sendable @escaping (PermissionType) -> PermissionRequestOptions = { _ in
+    optionsProvider: @Sendable @escaping (PermissionType) -> PermissionOptions = { _ in
       .none
     }
   ) -> AsyncStream<Change> {
-    AsyncStream { continuation in
+    guard types.isEmpty == false else {
+      return AsyncStream { continuation in
+        continuation.finish()
+      }
+    }
+
+    return AsyncStream { continuation in
       let task = Task { @MainActor in
         let state = PermissionStatusObserverState(
           checker: checker,
           types: types,
           configuration: configuration,
-          statusOptionsProvider: statusOptionsProvider
+          optionsProvider: optionsProvider
         ) { change in
           continuation.yield(change)
         }
@@ -67,7 +73,7 @@ private final class PermissionStatusObserverState {
   private let interval: Duration
   private let configuration: PermissionObservationConfiguration
   private let types: [PermissionType]
-  private let statusOptionsProvider: @Sendable (PermissionType) -> PermissionRequestOptions
+  private let optionsProvider: @Sendable (PermissionType) -> PermissionOptions
   private let handler: @Sendable (PermissionStatusObserver.Change) -> Void
   private var task: Task<Void, Never>?
   private var lastStatuses: [PermissionType: PermissionStatusResult] = [:]
@@ -77,12 +83,12 @@ private final class PermissionStatusObserverState {
     checker: any PermissionChecking,
     types: [PermissionType],
     configuration: PermissionObservationConfiguration,
-    statusOptionsProvider: @escaping @Sendable (PermissionType) -> PermissionRequestOptions,
+    optionsProvider: @escaping @Sendable (PermissionType) -> PermissionOptions,
     handler: @escaping @Sendable (PermissionStatusObserver.Change) -> Void
   ) {
     self.checker = checker
     self.types = Self.uniqueTypes(types)
-    self.statusOptionsProvider = statusOptionsProvider
+    self.optionsProvider = optionsProvider
     interval = configuration.pollingInterval
     self.configuration = configuration
     self.handler = handler
@@ -106,7 +112,7 @@ private final class PermissionStatusObserverState {
   private func loop() async {
     while !Task.isCancelled {
       for type in types {
-        let options = statusOptionsProvider(type)
+        let options = optionsProvider(type)
         let newStatus = await checker.status(for: type, options: options)
         let oldStatus = lastStatuses[type]
         if let oldStatus, oldStatus != newStatus {
@@ -158,7 +164,7 @@ private final class PermissionStatusObserverState {
   }
 
   private func pollOnce(type: PermissionType) async {
-    let options = statusOptionsProvider(type)
+    let options = optionsProvider(type)
     let newStatus = await checker.status(for: type, options: options)
     let oldStatus = lastStatuses[type]
     if let oldStatus, oldStatus != newStatus {
@@ -174,7 +180,7 @@ private final class PermissionStatusObserverState {
   ) {
     handler(.init(type: type, oldStatus: oldStatus, newStatus: newStatus))
     if let customLog = configuration.logHandler {
-      customLog("[PermissionsKit] \(type) changed: \(oldStatus) -> \(newStatus)")
+      customLog("[PermissionsKit] \(type.id) changed: \(oldStatus) -> \(newStatus)")
     }
   }
 

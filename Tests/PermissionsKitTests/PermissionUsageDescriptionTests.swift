@@ -24,7 +24,7 @@ final class PermissionUsageDescriptionTests: XCTestCase {
     XCTAssertEqual(custom.missingUsageDescriptions(in: bundle), [.microphone])
   }
 
-  func testMissingUsageDescriptionsUsesRequestOptions() throws {
+  func testMissingUsageDescriptionsUsesPermissionOptions() throws {
     let readWriteBundle = try makeBundle(info: [
       UsageDescriptionKey.photos.rawValue: "Reads photos"
     ])

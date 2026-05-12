@@ -1,10 +1,10 @@
-/// Options that affect how a permission request is performed.
-public enum PermissionRequestOptions: Sendable, Hashable {
-  /// Use the default request behavior for the permission type.
+/// Options that affect permission status checks, requests, and metadata lookup.
+public enum PermissionOptions: Sendable, Hashable {
+  /// Use the default behavior for the permission type.
   case none
-  /// Options for notification requests.
+  /// Options for notification authorization.
   case notifications(NotificationRequestOptions)
-  /// Access level for Photos requests.
+  /// Access level for Photos authorization.
   case photos(PhotoAccessLevel)
 }
 
@@ -13,7 +13,7 @@ public struct NotificationRequestOptions: OptionSet, Sendable, Hashable {
   /// Raw option-set storage.
   public let rawValue: Int
 
-  /// Creates notification request options from a raw value.
+  /// Creates notification authorization options from a raw value.
   public init(rawValue: Int) {
     self.rawValue = rawValue
   }

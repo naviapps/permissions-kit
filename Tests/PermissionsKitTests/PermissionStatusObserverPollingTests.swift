@@ -72,7 +72,7 @@ private final class MutableStatusPermissionChecker: PermissionChecking, Sendable
 
   func status(
     for _: PermissionType,
-    options _: PermissionRequestOptions
+    options _: PermissionOptions
   ) async -> PermissionStatusResult {
     .supported(statusValue)
   }
@@ -81,7 +81,7 @@ private final class MutableStatusPermissionChecker: PermissionChecking, Sendable
     .supported(.opened)
   }
 
-  func requestAccess(for type: PermissionType, options _: PermissionRequestOptions) async
+  func requestAccess(for type: PermissionType, options _: PermissionOptions) async
     -> PermissionRequestResult
   {
     .unsupported(type.capability)

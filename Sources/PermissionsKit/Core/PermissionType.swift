@@ -137,8 +137,8 @@ public enum PermissionType: Sendable, Hashable, Identifiable {
 }
 
 extension PermissionType {
-  /// Default request options for this permission type.
-  public var defaultRequestOptions: PermissionRequestOptions {
+  /// Default permission options for this permission type.
+  public var defaultOptions: PermissionOptions {
     switch self {
     case .notifications:
       .notifications(.default)
@@ -279,11 +279,11 @@ extension PermissionType {
 
   /// Usage description keys required for this permission type.
   public var usageDescriptionKeys: [UsageDescriptionKey] {
-    usageDescriptionKeys(for: defaultRequestOptions)
+    usageDescriptionKeys(for: defaultOptions)
   }
 
-  /// Usage description keys required for this permission type and request options.
-  public func usageDescriptionKeys(for options: PermissionRequestOptions) -> [UsageDescriptionKey] {
+  /// Usage description keys required for this permission type and permission options.
+  public func usageDescriptionKeys(for options: PermissionOptions) -> [UsageDescriptionKey] {
     switch self {
     case .custom(let custom):
       custom.capability.usageDescriptionKeys
@@ -346,7 +346,7 @@ extension PermissionType {
   /// Returns missing usage description keys in the provided bundle.
   public func missingUsageDescriptions(
     in bundle: Bundle = .main,
-    options: PermissionRequestOptions = .none
+    options: PermissionOptions = .none
   ) -> [UsageDescriptionKey] {
     let info = bundle.infoDictionary ?? [:]
     return usageDescriptionKeys(for: options).filter { info[$0.rawValue] == nil }

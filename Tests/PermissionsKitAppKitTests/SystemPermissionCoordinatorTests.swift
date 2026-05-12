@@ -42,13 +42,30 @@ final class SystemPermissionCoordinatorTests: XCTestCase {
     XCTAssertEqual(requests, 1)
   }
 
-  func testEnsureAccessibilityPermissionUserInitiatedPresentsGuidanceAndOpensSettings() async {
+  func testAccessibilityGuidanceCancelDoesNotOpenSettings() async {
     let checker = StatusSequencePermissionChecker(statuses: [.denied, .denied])
     let recorder = DependencyRecorder()
     let coordinator = SystemPermissionCoordinator(
       guidance: .english,
       logger: NoopSystemPermissionLogger(),
       dependencies: recorder.dependencies(alertResponse: .alertSecondButtonReturn)
+    )
+
+    let result = await coordinator.ensureAccessibilityPermission(
+      using: checker, userInitiated: true)
+
+    XCTAssertFalse(result)
+    XCTAssertEqual(recorder.presentedAlerts.map(\.title), ["Accessibility permission required"])
+    XCTAssertEqual(recorder.openedSettingsURLs, [])
+  }
+
+  func testAccessibilityGuidanceAcceptOpensSettings() async {
+    let checker = StatusSequencePermissionChecker(statuses: [.denied, .denied])
+    let recorder = DependencyRecorder()
+    let coordinator = SystemPermissionCoordinator(
+      guidance: .english,
+      logger: NoopSystemPermissionLogger(),
+      dependencies: recorder.dependencies(alertResponse: .alertFirstButtonReturn)
     )
 
     let result = await coordinator.ensureAccessibilityPermission(
@@ -192,6 +209,52 @@ final class SystemPermissionCoordinatorTests: XCTestCase {
     )
   }
 
+  func testGuidanceLoggerRecordsPresentedGuidance() async {
+    let logger = RecordingSystemPermissionLogger()
+
+    let accessibilityRecorder = DependencyRecorder()
+    let accessibilityCoordinator = SystemPermissionCoordinator(
+      guidance: .english,
+      logger: logger,
+      dependencies: accessibilityRecorder.dependencies(alertResponse: .alertSecondButtonReturn)
+    )
+    _ = await accessibilityCoordinator.ensureAccessibilityPermission(
+      using: StatusSequencePermissionChecker(statuses: [.denied, .denied]),
+      userInitiated: true
+    )
+
+    let automationRecorder = DependencyRecorder()
+    var automationDependencies = automationRecorder.dependencies(
+      alertResponse: .alertSecondButtonReturn)
+    automationDependencies.determineAutomationPermission = { _ in OSStatus(errAEEventNotPermitted) }
+    let automationCoordinator = SystemPermissionCoordinator(
+      guidance: .english,
+      logger: logger,
+      dependencies: automationDependencies
+    )
+    _ = automationCoordinator.ensureAutomationPermission(userInitiated: true)
+
+    let screenRecordingRecorder = DependencyRecorder()
+    var screenRecordingDependencies =
+      screenRecordingRecorder.dependencies(alertResponse: .alertSecondButtonReturn)
+    screenRecordingDependencies.preflightScreenRecording = { false }
+    let screenRecordingCoordinator = SystemPermissionCoordinator(
+      guidance: .english,
+      logger: logger,
+      dependencies: screenRecordingDependencies
+    )
+    _ = await screenRecordingCoordinator.ensureScreenRecordingPermission()
+
+    XCTAssertEqual(
+      logger.messages,
+      [
+        "Enable Accessibility in System Settings to continue.",
+        "Allow automation in System Settings to continue.",
+        "Enable Screen Recording in System Settings to continue.",
+      ]
+    )
+  }
+
   func testResetScreenRecordingGuidanceAllowsGuidanceToBePresentedAgain() async {
     let recorder = DependencyRecorder()
     var dependencies = recorder.dependencies(alertResponse: .alertSecondButtonReturn)
@@ -216,6 +279,14 @@ final class SystemPermissionCoordinatorTests: XCTestCase {
   }
 }
 
+private final class RecordingSystemPermissionLogger: SystemPermissionLogger, @unchecked Sendable {
+  private(set) var messages: [String] = []
+
+  func warning(_ message: String) {
+    messages.append(message)
+  }
+}
+
 private final class StatusSequencePermissionChecker: PermissionChecking, @unchecked Sendable {
   private let statuses: [PermissionStatus]
   private var statusIndex = 0
@@ -225,7 +296,7 @@ private final class StatusSequencePermissionChecker: PermissionChecking, @unchec
     self.statuses = statuses
   }
 
-  func status(for type: PermissionType, options _: PermissionRequestOptions) async
+  func status(for type: PermissionType, options _: PermissionOptions) async
     -> PermissionStatusResult
   {
     guard type == .accessibility else { return .supported(.denied) }
@@ -234,7 +305,7 @@ private final class StatusSequencePermissionChecker: PermissionChecking, @unchec
     return .supported(status)
   }
 
-  func requestAccess(for type: PermissionType, options _: PermissionRequestOptions) async
+  func requestAccess(for type: PermissionType, options _: PermissionOptions) async
     -> PermissionRequestResult
   {
     guard type == .accessibility else { return .unsupported(type.capability) }

@@ -106,7 +106,7 @@ final class PermissionTypeTests: XCTestCase {
     XCTAssertEqual(PermissionType.notifications.usageDescriptionKeys, [])
   }
 
-  func testUsageDescriptionKeysUseRequestOptions() {
+  func testUsageDescriptionKeysUsePermissionOptions() {
     XCTAssertEqual(PermissionType.photos.usageDescriptionKeys(for: .none), [.photos])
     XCTAssertEqual(PermissionType.photos.usageDescriptionKeys(for: .photos(.readWrite)), [.photos])
     XCTAssertEqual(

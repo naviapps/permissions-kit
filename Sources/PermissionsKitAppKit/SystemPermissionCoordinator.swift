@@ -37,10 +37,12 @@ public final class SystemPermissionCoordinator {
     )
     automationStrategy = AutomationPermissionStrategy(
       guidance: guidance,
+      logger: logger,
       dependencies: dependencies
     )
     screenRecordingStrategy = ScreenRecordingPermissionStrategy(
       guidance: guidance,
+      logger: logger,
       dependencies: dependencies
     )
   }
@@ -115,7 +117,6 @@ struct AccessibilityPermissionEvaluation {
   let shouldResetPrompt: Bool
   let shouldResetGuidance: Bool
   let shouldPrompt: Bool
-  let shouldOpenSettingsImmediately: Bool
   let shouldPresentGuidance: Bool
   let initialResult: PermissionResult
 }
@@ -131,7 +132,6 @@ func evaluateAccessibilityPermission(
       shouldResetPrompt: true,
       shouldResetGuidance: true,
       shouldPrompt: false,
-      shouldOpenSettingsImmediately: false,
       shouldPresentGuidance: false,
       initialResult: .granted
     )
@@ -141,7 +141,6 @@ func evaluateAccessibilityPermission(
     shouldResetPrompt: false,
     shouldResetGuidance: false,
     shouldPrompt: hasPrompted == false,
-    shouldOpenSettingsImmediately: userInitiated && hasPrompted == false,
     shouldPresentGuidance: userInitiated && hasPresentedGuidance == false,
     initialResult: .pending
   )
@@ -247,10 +246,6 @@ private final class AccessibilityPermissionStrategy {
     if evaluation.shouldPrompt {
       hasPrompted = true
       _ = await permissions.requestAccess(for: .accessibility)
-      logger.warning(guidance.accessibility.message)
-      if evaluation.shouldOpenSettingsImmediately {
-        dependencies.openSettings(SystemPermissionURLs.accessibility)
-      }
     }
 
     presentGuidanceIfNeeded(userInitiated: evaluation.shouldPresentGuidance)
@@ -265,6 +260,7 @@ private final class AccessibilityPermissionStrategy {
   private func presentGuidanceIfNeeded(userInitiated: Bool) {
     guard userInitiated, !hasPresentedGuidance else { return }
     hasPresentedGuidance = true
+    logger.warning(guidance.accessibility.message)
 
     let response = dependencies.presentAlert(
       .init(
@@ -287,12 +283,16 @@ private final class AutomationPermissionStrategy {
   private var automationPermissionState: AutomationPermissionState = .unknown
   private var hasPresentedGuidance = false
   private let guidance: SystemPermissionGuidanceStrings
+  private let logger: SystemPermissionLogger
   private let dependencies: SystemPermissionCoordinatorDependencies
 
   init(
-    guidance: SystemPermissionGuidanceStrings, dependencies: SystemPermissionCoordinatorDependencies
+    guidance: SystemPermissionGuidanceStrings,
+    logger: SystemPermissionLogger,
+    dependencies: SystemPermissionCoordinatorDependencies
   ) {
     self.guidance = guidance
+    self.logger = logger
     self.dependencies = dependencies
   }
 
@@ -323,6 +323,7 @@ private final class AutomationPermissionStrategy {
   fileprivate func presentGuidance(force: Bool = false) {
     guard force || !hasPresentedGuidance else { return }
     hasPresentedGuidance = true
+    logger.warning(guidance.automation.message)
 
     let response = dependencies.presentAlert(
       .init(
@@ -365,12 +366,16 @@ private final class AutomationPermissionStrategy {
 private final class ScreenRecordingPermissionStrategy {
   private var hasPresentedGuidance = false
   private let guidance: SystemPermissionGuidanceStrings
+  private let logger: SystemPermissionLogger
   private let dependencies: SystemPermissionCoordinatorDependencies
 
   init(
-    guidance: SystemPermissionGuidanceStrings, dependencies: SystemPermissionCoordinatorDependencies
+    guidance: SystemPermissionGuidanceStrings,
+    logger: SystemPermissionLogger,
+    dependencies: SystemPermissionCoordinatorDependencies
   ) {
     self.guidance = guidance
+    self.logger = logger
     self.dependencies = dependencies
   }
 
@@ -397,6 +402,7 @@ private final class ScreenRecordingPermissionStrategy {
   private func presentGuidance() {
     guard !hasPresentedGuidance else { return }
     hasPresentedGuidance = true
+    logger.warning(guidance.screenRecording.message)
 
     let response = dependencies.presentAlert(
       .init(

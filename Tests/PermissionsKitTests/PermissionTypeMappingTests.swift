@@ -3,7 +3,7 @@ import XCTest
 @testable import PermissionsKit
 
 final class PermissionTypeMappingTests: XCTestCase {
-  func testDefaultRequestOptions() {
+  func testDefaultOptions() {
     let custom = PermissionType.custom(
       .init(
         id: "custom.permission",
@@ -18,11 +18,11 @@ final class PermissionTypeMappingTests: XCTestCase {
     for type in PermissionType.builtIn + [custom] {
       switch type {
       case .notifications:
-        XCTAssertEqual(type.defaultRequestOptions, .notifications(.default))
+        XCTAssertEqual(type.defaultOptions, .notifications(.default))
       case .photos:
-        XCTAssertEqual(type.defaultRequestOptions, .photos(.default))
+        XCTAssertEqual(type.defaultOptions, .photos(.default))
       default:
-        XCTAssertEqual(type.defaultRequestOptions, .none, "\(type) should not define defaults")
+        XCTAssertEqual(type.defaultOptions, .none, "\(type) should not define defaults")
       }
     }
   }

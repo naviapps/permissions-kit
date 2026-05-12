@@ -4,7 +4,7 @@ Model, check, request, and observe macOS privacy permissions.
 
 ## Overview
 
-PermissionsKit defines the platform-neutral core of the package. It provides stable permission identifiers, capability metadata, result types, request options, and a dependency-injected checker that can be backed by live macOS APIs or by test-specific closures.
+PermissionsKit defines the platform-neutral core of the package. It provides stable permission identifiers, capability metadata, result types, permission options, and a dependency-injected checker that can be backed by live macOS APIs or by test-specific closures.
 
 Import `PermissionsKit` when you want to:
 
@@ -15,6 +15,8 @@ Import `PermissionsKit` when you want to:
 - Observe permission status changes with ``PermissionStatusObserver``.
 
 For the live macOS implementation, import `PermissionsKitAppKit`.
+
+Use `PermissionsKit` alone for platform-neutral models, custom environments, and tests. Add `PermissionsKitAppKit` when your app needs the built-in live macOS implementation, System Settings links, or observable UI helpers.
 
 ## Checking Permission Status
 
@@ -34,6 +36,13 @@ let result = await checker.status(for: .camera)
 
 Use ``PermissionOperationResult/status`` when you only need the normalized status value. Check ``PermissionOperationResult/isUnsupported`` when the system does not expose a reliable API for the permission.
 
+Request access with ``PermissionChecker/requestAccess(for:options:)`` and open manual settings flows with ``PermissionChecker/openSystemSettings(for:)``:
+
+```swift
+let request = await checker.requestAccess(for: .camera)
+let settings = checker.openSystemSettings(for: .screenRecording)
+```
+
 ## Permission Capabilities
 
 Each ``PermissionType`` exposes a ``PermissionCapability``:
@@ -44,7 +53,7 @@ let capability = PermissionType.screenRecording.capability
 
 Capabilities tell host apps whether a permission supports status checks, request APIs, System Settings links, relaunch guidance, and usage-description requirements.
 
-Some macOS permission domains are settings-only. For those domains, PermissionsKit exposes metadata and System Settings links, but ``PermissionChecker/status(for:options:)`` and ``PermissionChecker/requestAccess(for:options:)`` return unsupported results instead of pretending that the status is known.
+Some macOS permission domains are settings-only. For those domains, PermissionsKit exposes metadata and System Settings links, but ``PermissionChecker/status(for:options:)`` and ``PermissionChecker/requestAccess(for:options:)`` return unsupported results instead of pretending that the status is known. Input Monitoring, Full Disk Access, Automation, and similar domains fall into this category because the standard live implementation cannot reliably report them as granted through public status APIs.
 
 ## Usage Descriptions
 
@@ -54,7 +63,7 @@ Use ``PermissionType/missingUsageDescriptions(in:)`` to detect missing `Info.pli
 let missingKeys = PermissionType.camera.missingUsageDescriptions()
 ```
 
-Pass request options when the required key depends on the request shape, such as add-only Photos access:
+Pass permission options when the required key depends on the request shape, such as add-only Photos access:
 
 ```swift
 let missingKeys = PermissionType.photos.missingUsageDescriptions(options: .photos(.addOnly))
@@ -74,6 +83,7 @@ let stream = PermissionStatusObserver.changes(
 ```
 
 The observer combines polling with selected system notifications where available.
+It emits changes after the first observed status; it does not emit an initial snapshot.
 
 ## Topics
 
@@ -82,7 +92,7 @@ The observer combines polling with selected system notifications where available
 - ``PermissionChecker``
 - ``PermissionChecking``
 - ``PermissionEnvironment``
-- ``PermissionRequestOptions``
+- ``PermissionOptions``
 - ``NotificationRequestOptions``
 - ``PhotoAccessLevel``
 

@@ -6,6 +6,17 @@ import XCTest
 
 @MainActor
 final class PermissionStatusObserverStreamTests: XCTestCase {
+  func testStreamFinishesImmediatelyForEmptyTypes() async {
+    let stream = PermissionStatusObserver.changes(
+      for: [],
+      using: SequenceChecker(sequences: [:])
+    )
+
+    var iterator = stream.makeAsyncIterator()
+    let change = await iterator.next()
+    XCTAssertNil(change)
+  }
+
   func testStreamEmitsChangeAndCustomLog() async {
     let checker = SequenceChecker(
       sequences: [
@@ -37,8 +48,54 @@ final class PermissionStatusObserverStreamTests: XCTestCase {
 
     await fulfillment(of: [exp], timeout: 1.0)
     task.cancel()
-    let count = await logSink.count()
-    XCTAssertGreaterThan(count, 0)
+    let entries = await logSink.snapshot()
+    XCTAssertEqual(entries.count, 1)
+    XCTAssertTrue(entries[0].contains("[PermissionsKit] accessibility changed:"))
+  }
+
+  func testCustomLogUsesStableTypeID() async {
+    let custom = PermissionType.custom(
+      .init(
+        id: "custom.permission",
+        capability: .init(
+          supportsStatusCheck: true,
+          supportsRequest: false,
+          systemSettingsURL: nil,
+          requiresRelaunch: false,
+          usageDescriptionKeys: []
+        )))
+    let checker = SequenceChecker(
+      sequences: [
+        custom: [.supported(.denied), .supported(.granted)]
+      ]
+    )
+    let logSink = LogSink()
+    let stream = PermissionStatusObserver.changes(
+      for: [custom],
+      using: checker,
+      configuration: .init(
+        pollingInterval: .milliseconds(10),
+        logHandler: { value in
+          Task { await logSink.append(value) }
+        }
+      )
+    )
+
+    let exp = expectation(description: "received change")
+    let task = Task {
+      for await change in stream where change.type == custom {
+        XCTAssertEqual(change.oldStatus, .supported(.denied))
+        XCTAssertEqual(change.newStatus, .supported(.granted))
+        exp.fulfill()
+        break
+      }
+    }
+
+    await fulfillment(of: [exp], timeout: 1.0)
+    task.cancel()
+    let entries = await logSink.snapshot()
+    XCTAssertEqual(entries.count, 1)
+    XCTAssertTrue(entries[0].contains("[PermissionsKit] custom.permission changed:"))
   }
 
   func testStreamRespondsToNotificationHooks() async {
@@ -114,7 +171,7 @@ final class PermissionStatusObserverStreamTests: XCTestCase {
     task.cancel()
   }
 
-  func testStreamUsesStatusOptionsProvider() async {
+  func testStreamUsesOptionsProvider() async {
     let checker = SequenceChecker(
       sequences: [
         .photos: [.supported(.denied), .supported(.granted)]
@@ -124,7 +181,7 @@ final class PermissionStatusObserverStreamTests: XCTestCase {
       for: [.photos],
       using: checker,
       configuration: .init(pollingInterval: .milliseconds(10)),
-      statusOptionsProvider: { type in
+      optionsProvider: { type in
         type == .photos ? .photos(.addOnly) : .none
       }
     )
@@ -154,8 +211,8 @@ private actor LogSink {
     entries.append(value)
   }
 
-  func count() -> Int {
-    entries.count
+  func snapshot() -> [String] {
+    entries
   }
 }
 
@@ -163,17 +220,17 @@ private final class SequenceChecker: PermissionChecking, @unchecked Sendable {
   private let lock = NSLock()
   private var sequences: [PermissionType: [PermissionStatusResult]]
   private var indices: [PermissionType: Int] = [:]
-  private var options: [PermissionType: [PermissionRequestOptions]] = [:]
+  private var options: [PermissionType: [PermissionOptions]] = [:]
 
   init(sequences: [PermissionType: [PermissionStatusResult]]) {
     self.sequences = sequences
   }
 
-  func status(for type: PermissionType, options requestOptions: PermissionRequestOptions) async
+  func status(for type: PermissionType, options permissionOptions: PermissionOptions) async
     -> PermissionStatusResult
   {
     lock.withLock {
-      options[type, default: []].append(requestOptions)
+      options[type, default: []].append(permissionOptions)
       let values = sequences[type] ?? [.supported(.unknown)]
       let index = indices[type, default: 0]
       let value = values[min(index, values.count - 1)]
@@ -182,13 +239,13 @@ private final class SequenceChecker: PermissionChecking, @unchecked Sendable {
     }
   }
 
-  func observedOptions(for type: PermissionType) -> [PermissionRequestOptions] {
+  func observedOptions(for type: PermissionType) -> [PermissionOptions] {
     lock.withLock {
       options[type, default: []]
     }
   }
 
-  func requestAccess(for type: PermissionType, options _: PermissionRequestOptions) async
+  func requestAccess(for type: PermissionType, options _: PermissionOptions) async
     -> PermissionRequestResult
   {
     .unsupported(type.capability)

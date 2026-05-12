@@ -10,12 +10,12 @@ public struct PermissionChecker: PermissionChecking {
   /// Returns the current status for a permission type.
   public func status(
     for type: PermissionType,
-    options: PermissionRequestOptions
+    options: PermissionOptions
   ) async -> PermissionStatusResult {
     guard type.supportsStatusCheck else {
       return .unsupported(type.capability)
     }
-    let resolvedOptions = options == .none ? type.defaultRequestOptions : options
+    let resolvedOptions = options == .none ? type.defaultOptions : options
     let status = await environment.status(type, resolvedOptions)
     return .supported(status)
   }
@@ -23,12 +23,12 @@ public struct PermissionChecker: PermissionChecking {
   /// Requests access to a permission type.
   public func requestAccess(
     for type: PermissionType,
-    options: PermissionRequestOptions
+    options: PermissionOptions
   ) async -> PermissionRequestResult {
     guard type.supportsRequest else {
       return .unsupported(type.capability)
     }
-    let resolvedOptions = options == .none ? type.defaultRequestOptions : options
+    let resolvedOptions = options == .none ? type.defaultOptions : options
     return await environment.request(type, resolvedOptions)
   }
 

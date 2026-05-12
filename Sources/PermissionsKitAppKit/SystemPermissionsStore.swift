@@ -46,17 +46,10 @@ public final class SystemPermissionsStore: ObservableObject, SystemPermissionsSt
     self.coordinator = coordinator
     self.automationStatusProvider = automationStatusProvider
     self.notificationStatusProvider = notificationStatusProvider
-    refreshAll()
   }
 
   /// Refreshes all tracked permission states.
-  public func refreshAll() {
-    Task { @MainActor in
-      await refreshAllAsync()
-    }
-  }
-
-  private func refreshAllAsync() async {
+  public func refreshAll() async {
     let accessibilityVersion = nextStateVersion(for: .accessibility)
     let automationVersion = nextStateVersion(for: .automation)
     let screenRecordingVersion = nextStateVersion(for: .screenRecording)
@@ -101,41 +94,45 @@ public final class SystemPermissionsStore: ObservableObject, SystemPermissionsSt
   }
 
   /// Requests Input Monitoring access and updates the published state.
-  public func requestInputMonitoringPermission() {
+  public func requestInputMonitoringPermission() async {
     let version = nextStateVersion(for: .inputMonitoring)
-    Task { @MainActor in
-      let result = await permissions.requestAccess(for: .inputMonitoring, options: .none)
-      if case .supported(let status) = result {
-        apply(status == .granted, for: .inputMonitoring, version: version) {
-          inputMonitoringGranted = $0
-        }
-        return
-      }
-      _ = permissions.openSystemSettings(for: .inputMonitoring)
-      apply(false, for: .inputMonitoring, version: version) {
+    await requestInputMonitoringPermission(version: version)
+  }
+
+  private func requestInputMonitoringPermission(version: Int) async {
+    let result = await permissions.requestAccess(for: .inputMonitoring, options: .none)
+    if case .supported(let status) = result {
+      apply(status == .granted, for: .inputMonitoring, version: version) {
         inputMonitoringGranted = $0
       }
+      return
+    }
+    _ = permissions.openSystemSettings(for: .inputMonitoring)
+    apply(false, for: .inputMonitoring, version: version) {
+      inputMonitoringGranted = $0
     }
   }
 
   /// Requests Accessibility access and updates the published state.
-  public func requestAccessibilityPermission() {
+  public func requestAccessibilityPermission() async {
     let version = nextStateVersion(for: .accessibility)
-    Task { @MainActor in
-      let granted =
-        await coordinator
-        .ensureAccessibilityPermission(using: permissions, userInitiated: true)
-      let didApply = apply(granted, for: .accessibility, version: version) {
-        accessibilityGranted = $0
-      }
-      handleResetIfGranted(didApply && granted) {
-        coordinator.resetAccessibilityGuidance()
-      }
+    await requestAccessibilityPermission(version: version)
+  }
+
+  private func requestAccessibilityPermission(version: Int) async {
+    let granted =
+      await coordinator
+      .ensureAccessibilityPermission(using: permissions, userInitiated: true)
+    let didApply = apply(granted, for: .accessibility, version: version) {
+      accessibilityGranted = $0
+    }
+    handleResetIfGranted(didApply && granted) {
+      coordinator.resetAccessibilityGuidance()
     }
   }
 
   /// Requests Automation access and updates the published state.
-  public func requestAutomationPermission() {
+  public func requestAutomationPermission() async {
     let version = nextStateVersion(for: .automation)
     let granted = coordinator.ensureAutomationPermission(userInitiated: true)
     let didApply = apply(granted, for: .automation, version: version) {
@@ -147,40 +144,44 @@ public final class SystemPermissionsStore: ObservableObject, SystemPermissionsSt
   }
 
   /// Requests Screen Recording access and updates the published state.
-  public func requestScreenRecordingPermission() {
+  public func requestScreenRecordingPermission() async {
     let version = nextStateVersion(for: .screenRecording)
-    Task { @MainActor in
-      let result = await permissions.requestAccess(for: .screenRecording, options: .none)
-      let granted: Bool
-      if case .supported(let status) = result {
-        granted = status == .granted
-      } else {
-        granted = false
-      }
-      let didApply = apply(granted, for: .screenRecording, version: version) {
-        screenRecordingGranted = $0
-      }
-      handleResetIfGranted(didApply && granted) {
-        coordinator.resetScreenRecordingGuidance()
-      }
+    await requestScreenRecordingPermission(version: version)
+  }
+
+  private func requestScreenRecordingPermission(version: Int) async {
+    let result = await permissions.requestAccess(for: .screenRecording, options: .none)
+    let granted: Bool
+    if case .supported(let status) = result {
+      granted = status == .granted
+    } else {
+      granted = false
+    }
+    let didApply = apply(granted, for: .screenRecording, version: version) {
+      screenRecordingGranted = $0
+    }
+    handleResetIfGranted(didApply && granted) {
+      coordinator.resetScreenRecordingGuidance()
     }
   }
 
   /// Requests notification authorization and updates the published state.
-  public func requestNotificationPermission() {
+  public func requestNotificationPermission() async {
     let version = nextStateVersion(for: .notifications)
-    Task { @MainActor in
-      let result = await permissions.requestAccess(
-        for: .notifications, options: .notifications(.default))
-      if case .supported(let status) = result {
-        apply(status == .granted, for: .notifications, version: version) {
-          notificationsGranted = $0
-        }
-        return
-      }
-      apply(false, for: .notifications, version: version) {
+    await requestNotificationPermission(version: version)
+  }
+
+  private func requestNotificationPermission(version: Int) async {
+    let result = await permissions.requestAccess(
+      for: .notifications, options: .notifications(.default))
+    if case .supported(let status) = result {
+      apply(status == .granted, for: .notifications, version: version) {
         notificationsGranted = $0
       }
+      return
+    }
+    apply(false, for: .notifications, version: version) {
+      notificationsGranted = $0
     }
   }
 
