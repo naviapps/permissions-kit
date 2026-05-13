@@ -8,6 +8,12 @@ This project follows semantic versioning.
 
 No unreleased changes.
 
+## [1.0.1] - 2026-05-13
+
+### Changed
+
+- Add CI validation for public symbol graph generation to catch Swift Package Index documentation issues earlier.
+
 ## [1.0.0] - 2026-05-13
 
 ### Added

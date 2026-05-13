@@ -27,3 +27,6 @@ jobs:
 
       - name: Build and test
         run: swift test
+
+      - name: Validate public symbol graph
+        run: swift package dump-symbol-graph --minimum-access-level public --skip-synthesized-members

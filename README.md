@@ -24,7 +24,7 @@ The package is split into two libraries:
 Add this package to your Swift Package dependencies:
 
 ```swift
-.package(url: "https://github.com/naviapps/permissions-kit.git", from: "1.0.0")
+.package(url: "https://github.com/naviapps/permissions-kit.git", from: "1.0.1")
 ```
 
 Then add one or both products to your target:
