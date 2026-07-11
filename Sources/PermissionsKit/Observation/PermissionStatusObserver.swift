@@ -1,40 +1,38 @@
 import Foundation
 
-#if canImport(Contacts)
-  import Contacts
-#endif
-#if canImport(EventKit)
-  import EventKit
-#endif
-
 /// Polls for permission status changes and emits a stream of updates.
-public struct PermissionStatusObserver: Sendable {
+public enum PermissionStatusObserver {
   /// A single change event emitted by the observer.
-  public struct Change: Sendable, Equatable {
+  public struct Change: Sendable, Equatable, Hashable {
     /// Permission type that changed.
     public let type: PermissionType
-    /// Previously observed status.
-    public let oldStatus: PermissionStatusResult
-    /// Newly observed status.
-    public let newStatus: PermissionStatusResult
+    /// Previously observed status-check result.
+    public let previousResult: PermissionOperationResult<PermissionStatus>
+    /// Newly observed status-check result.
+    public let currentResult: PermissionOperationResult<PermissionStatus>
 
     /// Creates a change event.
     public init(
-      type: PermissionType, oldStatus: PermissionStatusResult, newStatus: PermissionStatusResult
+      type: PermissionType,
+      previousResult: PermissionOperationResult<PermissionStatus>,
+      currentResult: PermissionOperationResult<PermissionStatus>
     ) {
       self.type = type
-      self.oldStatus = oldStatus
-      self.newStatus = newStatus
+      self.previousResult = previousResult
+      self.currentResult = currentResult
     }
   }
 
   /// Builds a stream that yields whenever a permission status changes.
+  ///
+  /// When `options` is omitted, each permission type uses its `defaultOptions`.
+  /// Polling intervals below 250 milliseconds are clamped to 250 milliseconds.
   public static func changes(
     for types: [PermissionType],
     using checker: any PermissionChecking,
-    configuration: PermissionObservationConfiguration = .init(),
-    optionsProvider: @Sendable @escaping (PermissionType) -> PermissionOptions = { _ in
-      .none
+    pollingInterval: Duration = .seconds(2),
+    options: @Sendable @escaping (PermissionType) -> PermissionOptions = {
+      $0.defaultOptions
     }
   ) -> AsyncStream<Change> {
     guard types.isEmpty == false else {
@@ -43,21 +41,25 @@ public struct PermissionStatusObserver: Sendable {
       }
     }
 
-    return AsyncStream { continuation in
-      let task = Task { @MainActor in
-        let state = PermissionStatusObserverState(
-          checker: checker,
-          types: types,
-          configuration: configuration,
-          optionsProvider: optionsProvider
-        ) { change in
-          continuation.yield(change)
-        }
-        state.start()
+    let observedTypes = PermissionStatusObservation.uniqueTypes(types)
+    let interval = PermissionStatusObservation.clampedInterval(pollingInterval)
+
+    return AsyncStream(bufferingPolicy: .bufferingNewest(observedTypes.count)) { continuation in
+      let task = Task {
+        var lastResults: [PermissionType: PermissionOperationResult<PermissionStatus>] = [:]
+
         while !Task.isCancelled {
-          try? await Task.sleep(for: .seconds(60 * 60))
+          for type in observedTypes {
+            let currentResult = await checker.status(for: type, options: options(type))
+            if let previousResult = lastResults[type], previousResult != currentResult {
+              continuation.yield(
+                .init(type: type, previousResult: previousResult, currentResult: currentResult)
+              )
+            }
+            lastResults[type] = currentResult
+          }
+          try? await Task.sleep(for: interval)
         }
-        state.stop()
       }
 
       continuation.onTermination = { _ in
@@ -67,129 +69,18 @@ public struct PermissionStatusObserver: Sendable {
   }
 }
 
-@MainActor
-private final class PermissionStatusObserverState {
-  private let checker: any PermissionChecking
-  private let interval: Duration
-  private let configuration: PermissionObservationConfiguration
-  private let types: [PermissionType]
-  private let optionsProvider: @Sendable (PermissionType) -> PermissionOptions
-  private let handler: @Sendable (PermissionStatusObserver.Change) -> Void
-  private var task: Task<Void, Never>?
-  private var lastStatuses: [PermissionType: PermissionStatusResult] = [:]
-  private var tokens: [NSObjectProtocol] = []
-
-  init(
-    checker: any PermissionChecking,
-    types: [PermissionType],
-    configuration: PermissionObservationConfiguration,
-    optionsProvider: @escaping @Sendable (PermissionType) -> PermissionOptions,
-    handler: @escaping @Sendable (PermissionStatusObserver.Change) -> Void
-  ) {
-    self.checker = checker
-    self.types = Self.uniqueTypes(types)
-    self.optionsProvider = optionsProvider
-    interval = configuration.pollingInterval
-    self.configuration = configuration
-    self.handler = handler
-  }
-
-  func start() {
-    guard task == nil else { return }
-    registerEventHooks()
-    task = Task { [weak self] in
-      guard let self else { return }
-      await loop()
-    }
-  }
-
-  func stop() {
-    task?.cancel()
-    task = nil
-    unregisterEventHooks()
-  }
-
-  private func loop() async {
-    while !Task.isCancelled {
-      for type in types {
-        let options = optionsProvider(type)
-        let newStatus = await checker.status(for: type, options: options)
-        let oldStatus = lastStatuses[type]
-        if let oldStatus, oldStatus != newStatus {
-          emitChange(type: type, oldStatus: oldStatus, newStatus: newStatus)
-        }
-        lastStatuses[type] = newStatus
-      }
-      try? await Task.sleep(for: interval)
-    }
-  }
-
-  private func registerEventHooks() {
-    let center = NotificationCenter.default
-    for type in types {
-      switch type {
-      case .contacts:
-        #if canImport(Contacts)
-          let token = center.addObserver(forName: .CNContactStoreDidChange, object: nil, queue: nil)
-          {
-            [weak self] _ in
-            Task { @MainActor in
-              await self?.pollOnce(type: .contacts)
-            }
-          }
-          tokens.append(token)
-        #endif
-      case .calendars, .reminders:
-        #if canImport(EventKit)
-          let token = center.addObserver(forName: .EKEventStoreChanged, object: nil, queue: nil) {
-            [weak self] _ in
-            Task { @MainActor in
-              await self?.pollOnce(type: type)
-            }
-          }
-          tokens.append(token)
-        #endif
-      default:
-        break
-      }
-    }
-  }
-
-  private func unregisterEventHooks() {
-    let center = NotificationCenter.default
-    for token in tokens {
-      center.removeObserver(token)
-    }
-    tokens.removeAll()
-  }
-
-  private func pollOnce(type: PermissionType) async {
-    let options = optionsProvider(type)
-    let newStatus = await checker.status(for: type, options: options)
-    let oldStatus = lastStatuses[type]
-    if let oldStatus, oldStatus != newStatus {
-      emitChange(type: type, oldStatus: oldStatus, newStatus: newStatus)
-    }
-    lastStatuses[type] = newStatus
-  }
-
-  private func emitChange(
-    type: PermissionType,
-    oldStatus: PermissionStatusResult,
-    newStatus: PermissionStatusResult
-  ) {
-    handler(.init(type: type, oldStatus: oldStatus, newStatus: newStatus))
-    if let customLog = configuration.logHandler {
-      customLog("[PermissionsKit] \(type.id) changed: \(oldStatus) -> \(newStatus)")
-    }
-  }
-
-  private static func uniqueTypes(_ types: [PermissionType]) -> [PermissionType] {
+private enum PermissionStatusObservation {
+  static func uniqueTypes(_ types: [PermissionType]) -> [PermissionType] {
     var seen: Set<PermissionType> = []
     var unique: [PermissionType] = []
     for type in types where seen.insert(type).inserted {
       unique.append(type)
     }
     return unique
+  }
+
+  static func clampedInterval(_ interval: Duration) -> Duration {
+    let minimum: Duration = .milliseconds(250)
+    return interval < minimum ? minimum : interval
   }
 }

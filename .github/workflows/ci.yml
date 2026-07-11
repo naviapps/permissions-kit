@@ -9,24 +9,24 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  test:
+  check:
     name: SwiftPM
     runs-on: macos-15
     timeout-minutes: 15
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Show Swift version
         run: swift --version
 
-      - name: Lint formatting
-        run: swift format lint --recursive --strict Sources Tests Package.swift
-
-      - name: Build and test
-        run: swift test
-
-      - name: Validate public symbol graph
-        run: swift package dump-symbol-graph --minimum-access-level public --skip-synthesized-members
+      - name: Run checks
+        run: make check
