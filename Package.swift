@@ -1,9 +1,8 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
   name: "PermissionsKit",
-  defaultLocalization: "en",
   platforms: [.macOS(.v14)],
   products: [
     .library(
@@ -17,24 +16,22 @@ let package = Package(
   ],
   targets: [
     .target(
-      name: "PermissionsKit",
-      path: "Sources/PermissionsKit"
+      name: "PermissionsKit"
     ),
     .target(
       name: "PermissionsKitAppKit",
-      dependencies: ["PermissionsKit"],
-      path: "Sources/PermissionsKitAppKit"
+      dependencies: ["PermissionsKit"]
     ),
     .testTarget(
       name: "PermissionsKitTests",
-      dependencies: ["PermissionsKit"],
-      path: "Tests/PermissionsKitTests"
+      dependencies: ["PermissionsKit"]
     ),
     .testTarget(
       name: "PermissionsKitAppKitTests",
-      dependencies: ["PermissionsKitAppKit"],
-      path: "Tests/PermissionsKitAppKitTests"
+      dependencies: [
+        "PermissionsKit",
+        "PermissionsKitAppKit",
+      ]
     ),
-  ],
-  swiftLanguageVersions: [.v5]
+  ]
 )

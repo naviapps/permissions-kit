@@ -1,15 +1,14 @@
 ## Summary
 
-
-## Changes
+-
 
 ## Validation
 
-- [ ] `swift format lint --recursive --strict Sources Tests Package.swift`
-- [ ] `swift test`
-- [ ] Documentation updated, if needed
-- [ ] `CHANGELOG.md` updated, if user-facing behavior changed
-- [ ] No generated build output committed
-- [ ] No secrets, local paths, or internal app references included
+- [ ] `make check`
+- [ ] Documentation or `CHANGELOG.md` updated if public behavior changed
 
-## Notes
+## Checklist
+
+- [ ] Public API changes are intentional.
+- [ ] Host-app responsibilities stay outside this package.
+- [ ] No generated output, dependency caches, local state, secrets, private logs, local paths, or app-internal references are included.
